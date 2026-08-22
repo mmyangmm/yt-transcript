@@ -1,0 +1,15 @@
+{
+  "name": "逐字稿擷取 · YT Transcript",
+  "short_name": "逐字稿",
+  "description": "貼上 YouTube 網址，一鍵擷取逐字稿（原始字幕或 AI 轉錄），可下載 txt/srt 並保存歷史記錄",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0A0F1C",
+  "theme_color": "#0F172A",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
