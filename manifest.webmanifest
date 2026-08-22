@@ -1,7 +1,7 @@
 {
-  "name": "逐字稿擷取 · YT Transcript",
-  "short_name": "逐字稿",
-  "description": "貼上 YouTube 網址，一鍵擷取逐字稿（原始字幕或 AI 轉錄），可下載 txt/srt 並保存歷史記錄",
+  "name": "影片重點整理 · YT Recap",
+  "short_name": "重點整理",
+  "description": "貼上 YouTube 網址，一鍵用 Gemini 生成影片重點整理報告；也可取得逐字稿並保存歷史記錄",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

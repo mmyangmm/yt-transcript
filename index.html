@@ -7,8 +7,8 @@
 <meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="逐字稿">
-<title>逐字稿擷取 · YT Transcript</title>
+<meta name="apple-mobile-web-app-title" content="重點整理">
+<title>影片重點整理 · YT Recap</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="./icon.svg">
 <link rel="apple-touch-icon" href="./icon.svg">
@@ -167,6 +167,15 @@
   .report ul.actions li:last-child { border-bottom: none; }
   .report ul.actions li::before { content: ""; position: absolute; left: 3px; top: 14px; width: 7px; height: 7px; border-radius: 2px; background: var(--green); }
   .report .conclusion { font-size: 14px; line-height: 1.7; color: var(--text-muted); }
+  .tx-details { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elev); }
+  .tx-summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--text-muted); -webkit-tap-highlight-color: transparent; }
+  .tx-summary::-webkit-details-marker { display: none; }
+  .tx-summary:hover { color: var(--text); }
+  .tx-summary .chev { width: 16px; height: 16px; flex-shrink: 0; transition: transform .2s; }
+  .tx-details[open] .tx-summary .chev { transform: rotate(180deg); }
+  .tx-body { padding: 0 12px 12px; }
+  .tx-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .tx-details .transcript { max-height: 440px; }
 
   .view-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .view-bar .seg { margin-bottom: 0; flex-shrink: 0; }
@@ -236,8 +245,8 @@
         </svg>
       </div>
       <div>
-        <div class="eyebrow">// YT Transcript</div>
-        <h1>逐字稿擷取</h1>
+        <div class="eyebrow">// YT Recap</div>
+        <h1>影片重點整理</h1>
       </div>
     </div>
     <button class="icon-btn" id="settingsBtn" aria-label="設定" title="設定">
@@ -258,11 +267,11 @@
     </label>
     <label class="field">
       <span class="field-name">Gemini 模型</span>
-      <input type="text" id="model" class="input-mono" list="modelList" placeholder="gemini-2.5-flash" spellcheck="false">
+      <input type="text" id="model" class="input-mono" list="modelList" placeholder="gemini-3.6-flash" spellcheck="false">
       <datalist id="modelList">
-        <option value="gemini-2.5-flash">快速、免費額度高（建議）</option>
-        <option value="gemini-2.5-pro">最準、較慢</option>
-        <option value="gemini-2.5-flash-lite">最省最快</option>
+        <option value="gemini-3.6-flash">快速、免費額度高（建議）</option>
+        <option value="gemini-3.7-flash">最新</option>
+        <option value="gemini-3.5-flash-lite">最省最快</option>
       </datalist>
     </label>
     <p class="key-note">
@@ -276,36 +285,45 @@
 
   <!-- Input -->
   <section class="panel">
-    <div class="panel-label">擷取逐字稿</div>
-    <div class="seg" id="engineSeg">
-      <button data-engine="original" class="active">原始字幕 · 免金鑰</button>
-      <button data-engine="gemini">AI 轉錄 · Gemini</button>
-    </div>
+    <div class="panel-label">影片重點整理</div>
     <label class="field">
       <span class="field-name">YouTube 網址</span>
       <input type="url" id="url" class="input-mono" placeholder="https://www.youtube.com/watch?v=..." spellcheck="false" autocomplete="off">
     </label>
-    <label class="field">
-      <span class="field-name">語言 <span class="hint" id="langHint">原始字幕：挑選字幕語言</span></span>
-      <select id="lang">
-        <option value="">自動（預設軌）</option>
-        <option value="zh-Hant">繁體中文</option>
-        <option value="zh-Hans">简体中文</option>
-        <option value="en">English</option>
-        <option value="ja">日本語</option>
-        <option value="ko">한국어</option>
-      </select>
-    </label>
-    <button class="btn" id="grabBtn">
+    <div class="row" style="margin-bottom:14px;">
+      <label class="field" style="margin-bottom:0;">
+        <span class="field-name">輸出語言</span>
+        <select id="lang">
+          <option value="">自動（依影片）</option>
+          <option value="zh-Hant">繁體中文</option>
+          <option value="zh-Hans">简体中文</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+        </select>
+      </label>
+      <label class="field" style="margin-bottom:0;">
+        <span class="field-name">字幕來源 <span class="hint" id="langHint">沒字幕改 AI 轉錄</span></span>
+        <select id="engineSel">
+          <option value="original">原始字幕 · 免金鑰</option>
+          <option value="gemini">AI 轉錄 · Gemini</option>
+        </select>
+      </label>
+    </div>
+    <button class="btn" id="recapBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5 10.1 7.6z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
+      一鍵重點整理
+    </button>
+    <button class="btn btn-ghost" id="grabBtn" style="width:100%; margin-top:8px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>
-      一鍵擷取
+      只擷取逐字稿（不整理）
     </button>
   </section>
 
   <!-- Loading -->
   <section id="status">
     <div class="spinner"></div>
-    <div class="msg" id="statusMsg">取得字幕中…</div>
+    <div class="msg" id="statusMsg">讀取影片內容中…</div>
     <div class="timer" id="statusTimer">00:00</div>
   </section>
 
@@ -325,7 +343,7 @@
 
   <div class="footnote">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-    <span>原始字幕需影片本身有字幕；沒有字幕時改用 AI 轉錄</span>
+    <span>先取得字幕再用 Gemini 整理重點；沒有字幕時改用 AI 轉錄</span>
   </div>
 </main>
 
@@ -338,10 +356,15 @@
   const LS = { captionApi: "yt.captionApi", key: "yt.apiKey", model: "yt.model", engine: "yt.engine", lang: "yt.lang", history: "yt.history" };
   const DEFAULT_API = "https://youtube-transcript.ai";
 
+  const DEFAULT_MODEL = "gemini-3.6-flash";
   // Restore (falling back to the recap tool's stored key/model if present)
   $("captionApi").value = localStorage.getItem(LS.captionApi) || DEFAULT_API;
   $("apiKey").value = localStorage.getItem(LS.key) || localStorage.getItem("vr.apiKey") || "";
-  $("model").value = localStorage.getItem(LS.model) || localStorage.getItem("vr.model") || "gemini-2.5-flash";
+  // Migrate the retired gemini-2.5-flash to the current default
+  let storedModel = localStorage.getItem(LS.model) || localStorage.getItem("vr.model") || DEFAULT_MODEL;
+  if (storedModel === "gemini-2.5-flash" || storedModel === "gemini-2.0-flash") storedModel = DEFAULT_MODEL;
+  $("model").value = storedModel;
+  localStorage.setItem(LS.model, storedModel);
   let engine = localStorage.getItem(LS.engine) || "original";
   $("lang").value = localStorage.getItem(LS.lang) || "";
   let currentView = "timestamp";
@@ -361,20 +384,18 @@
   $("saveSettings").addEventListener("click", () => {
     localStorage.setItem(LS.captionApi, ($("captionApi").value.trim() || DEFAULT_API).replace(/\/+$/, ""));
     localStorage.setItem(LS.key, $("apiKey").value.trim());
-    localStorage.setItem(LS.model, ($("model").value.trim() || "gemini-2.5-flash"));
+    localStorage.setItem(LS.model, ($("model").value.trim() || DEFAULT_MODEL));
     $("settings").classList.remove("open");
     toast("設定已儲存");
   });
 
-  // Engine toggle
-  $("engineSeg").querySelectorAll("button").forEach((b) => {
-    if (b.dataset.engine === engine) b.classList.add("active"); else b.classList.remove("active");
-    b.addEventListener("click", () => {
-      engine = b.dataset.engine;
-      localStorage.setItem(LS.engine, engine);
-      $("engineSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
-      $("langHint").textContent = engine === "gemini" ? "AI 轉錄：輸出語言" : "原始字幕：挑選字幕語言";
-    });
+  // Engine (subtitle source) select
+  $("engineSel").value = engine;
+  $("langHint").textContent = engine === "gemini" ? "Gemini 直接聽影片" : "沒字幕改 AI 轉錄";
+  $("engineSel").addEventListener("change", (e) => {
+    engine = e.target.value;
+    localStorage.setItem(LS.engine, engine);
+    $("langHint").textContent = engine === "gemini" ? "Gemini 直接聽影片" : "沒字幕改 AI 轉錄";
   });
   $("lang").addEventListener("change", (e) => localStorage.setItem(LS.lang, e.target.value));
 
@@ -419,7 +440,7 @@
 
   // Loading
   let timerInt, msgInt, startTs;
-  const msgs = { original: ["取得字幕中…", "解析字幕軌…", "整理段落…"], gemini: ["上傳影片給 Gemini…", "聆聽並轉錄中…", "整理逐字稿…", "快好了…"] };
+  const msgs = { original: ["讀取影片字幕中…", "解析字幕軌…", "準備整理…"], gemini: ["上傳影片給 Gemini…", "聆聽並轉錄中…", "準備整理…", "快好了…"] };
   function startLoading(eng) {
     $("status").classList.add("show"); $("result").classList.remove("show"); startTs = Date.now();
     const list = msgs[eng] || msgs.original; let i = 0; $("statusMsg").textContent = list[0];
@@ -447,7 +468,7 @@
 
   async function fetchGemini(videoId, lang) {
     const apiKey = ($("apiKey").value || localStorage.getItem(LS.key) || "").trim();
-    const model = ($("model").value.trim() || "gemini-2.5-flash");
+    const model = ($("model").value.trim() || DEFAULT_MODEL);
     if (!apiKey) { const e = new Error("AI 轉錄需要 Gemini 金鑰，請先到設定填入。"); e.openSettings = true; throw e; }
     localStorage.setItem(LS.key, apiKey); localStorage.setItem(LS.model, model);
     const L = lang ? langName(lang) : "影片原本的語言";
@@ -488,12 +509,20 @@
   }
 
   // Main
-  async function grab() {
+  function setBusy(b) { ["recapBtn", "grabBtn"].forEach((id) => { const el = $(id); if (el) el.disabled = b; }); }
+
+  // grab(autoSummarize): fetch transcript; if autoSummarize, also generate the recap report.
+  async function grab(autoSummarize) {
     clearAlert();
     const videoId = extractVideoId($("url").value);
     if (!videoId) { showAlert("看不懂這個 YouTube 網址，請確認後再試。"); return; }
+    // For the recap flow, a Gemini key is required up front.
+    if (autoSummarize) {
+      const k = ($("apiKey").value || localStorage.getItem(LS.key) || "").trim();
+      if (!k) { showAlert("生成重點整理需要 Gemini 金鑰，請先到右上齒輪設定填入。"); $("settings").classList.add("open"); return; }
+    }
     const lang = $("lang").value;
-    $("grabBtn").disabled = true; startLoading(engine);
+    setBusy(true); startLoading(engine);
     try {
       let parsed;
       if (engine === "gemini") parsed = await fetchGemini(videoId, lang);
@@ -509,7 +538,9 @@
       saveHistory(record);
       renderResult(record);
       renderHistory();
+      stopLoading();
       $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+      if (autoSummarize) await summarize(record);
     } catch (err) {
       let msg = err.message || String(err);
       let extra = "";
@@ -518,11 +549,10 @@
       if (err.openSettings) $("settings").classList.add("open");
       const sg = $("switchGemini");
       if (sg) sg.addEventListener("click", () => {
-        engine = "gemini"; localStorage.setItem(LS.engine, engine);
-        $("engineSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x.dataset.engine === "gemini"));
-        $("langHint").textContent = "AI 轉錄：輸出語言"; clearAlert(); grab();
+        engine = "gemini"; localStorage.setItem(LS.engine, engine); $("engineSel").value = "gemini";
+        $("langHint").textContent = "Gemini 直接聽影片"; clearAlert(); grab(autoSummarize);
       });
-    } finally { stopLoading(); $("grabBtn").disabled = false; }
+    } finally { stopLoading(); setBusy(false); }
   }
 
   // Render result
@@ -539,7 +569,7 @@
     let h = `<div class="result-head">
       <img class="thumb" src="${thumbUrl(rec.videoId)}" alt="" onerror="this.style.display='none'">
       <div class="rh-body">
-        <h2 class="result-title">${esc(rec.title || "逐字稿")}</h2>
+        <h2 class="result-title">${esc(rec.title || "影片重點")}</h2>
         <div class="result-meta"><span class="chip">${engineLabel}</span>${esc(metaBits.join(" · "))}</div>
       </div>
     </div>`;
@@ -549,25 +579,35 @@
     h += `<div class="result-actions">
       <button class="btn-sum" id="summarizeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5 10.1 7.6z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>重點整理</button>
       <a class="btn-ghost" href="${esc(rec.url)}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>開啟影片</a>
-      <button class="btn-ghost" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>複製</button>
-      <button class="btn-ghost" id="dlTxt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>下載 .txt</button>
-      <button class="btn-ghost" id="dlSrt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M6 11h4"/><path d="M6 15h8"/></svg>下載 .srt</button>
     </div>`;
 
+    // Report first
     h += `<div id="summaryBox"></div>`;
 
-    h += `<div class="view-bar">
-      <div class="seg" id="viewSeg">
-        <button data-view="timestamp" class="active">時間戳</button>
-        <button data-view="plain">純文字</button>
+    // Transcript collapsed into a secondary section
+    h += `<details class="tx-details">
+      <summary class="tx-summary"><span>逐字稿 · ${segCount} 段</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <div class="tx-body">
+        <div class="tx-tools">
+          <button class="btn-ghost" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>複製</button>
+          <button class="btn-ghost" id="dlTxt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>下載 .txt</button>
+          <button class="btn-ghost" id="dlSrt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M6 11h4"/><path d="M6 15h8"/></svg>下載 .srt</button>
+        </div>
+        <div class="view-bar">
+          <div class="seg" id="viewSeg">
+            <button data-view="timestamp" class="active">時間戳</button>
+            <button data-view="plain">純文字</button>
+          </div>
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input type="text" id="search" class="input-mono" placeholder="搜尋逐字稿…" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+        <div class="transcript" id="transcript">${renderSegments(rec, "")}</div>
       </div>
-      <div class="search-wrap">
-        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" id="search" class="input-mono" placeholder="搜尋逐字稿…" spellcheck="false" autocomplete="off">
-      </div>
-    </div>`;
-
-    h += `<div class="transcript" id="transcript">${renderSegments(rec, "")}</div>`;
+    </details>`;
 
     const el = $("result"); el.innerHTML = h; el.classList.add("show");
 
@@ -639,7 +679,7 @@
 
   async function summarize(rec) {
     const apiKey = ($("apiKey").value || localStorage.getItem(LS.key) || "").trim();
-    const model = ($("model").value.trim() || localStorage.getItem(LS.model) || "gemini-2.5-flash");
+    const model = ($("model").value.trim() || localStorage.getItem(LS.model) || DEFAULT_MODEL);
     const box = $("summaryBox");
     if (!apiKey) { showAlert("生成重點整理需要 Gemini 金鑰，請先到右上齒輪設定填入。"); $("settings").classList.add("open"); return; }
     const btn = $("summarizeBtn"); if (btn) btn.disabled = true;
@@ -669,7 +709,7 @@ ${transcript}`;
       rec.summary = parsed;
       localStorage.setItem(LS.model, model);
       const arr = getHistory(); const i = arr.findIndex((r) => r.id === rec.id);
-      if (i >= 0) { arr[i].summary = parsed; setHistory(arr); }
+      if (i >= 0) { arr[i].summary = parsed; setHistory(arr); renderHistory(); }
       renderSummary(rec);
       $("summaryBox").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
@@ -729,7 +769,7 @@ ${transcript}`;
     if (!a.length) { el.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg><div>還沒有擷取記錄</div></div>`; return; }
     el.innerHTML = a.map((r) => {
       const t = r.title || "逐字稿";
-      const meta = new Date(r.createdAt).toLocaleDateString("zh-TW") + " · " + (r.engine === "gemini" ? "AI 轉錄" : "原始字幕") + " · " + (r.segments ? r.segments.length + " 段" : "");
+      const meta = new Date(r.createdAt).toLocaleDateString("zh-TW") + " · " + (r.summary ? "✦ 已整理" : (r.engine === "gemini" ? "AI 轉錄" : "逐字稿")) + " · " + (r.segments ? r.segments.length + " 段" : "");
       return `<div class="hist-item" data-id="${esc(r.id)}">
         <img class="hist-thumb" src="${thumbUrl(r.videoId)}" alt="" onerror="this.style.visibility='hidden'">
         <div class="hist-body"><h5>${esc(t)}</h5><div class="hist-meta">${esc(meta)}</div></div>
@@ -768,8 +808,9 @@ ${transcript}`;
   });
 
   // Bind
-  $("grabBtn").addEventListener("click", grab);
-  $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") grab(); });
+  $("recapBtn").addEventListener("click", () => grab(true));
+  $("grabBtn").addEventListener("click", () => grab(false));
+  $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") grab(true); });
   renderHistory();
 
   if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
