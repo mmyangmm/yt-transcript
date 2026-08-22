@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F172A">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="逐字稿">
+<title>逐字稿擷取 · YT Transcript</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #0A0F1C;
+    --bg-elev: #0F172A;
+    --surface: #111A2E;
+    --surface-hover: #16213A;
+    --border: #1E2A44;
+    --border-strong: #2A3A5C;
+    --text: #F1F5F9;
+    --text-muted: #94A3B8;
+    --text-dim: #64748B;
+    --accent: #38BDF8;
+    --accent-glow: rgba(56, 189, 248, 0.32);
+    --accent-bg: rgba(56, 189, 248, 0.10);
+    --accent-border: rgba(56, 189, 248, 0.26);
+    --accent-strong: #0EA5E9;
+    --green: #22C55E;
+    --amber: #F59E0B;
+
+    --radius: 14px;
+    --radius-sm: 8px;
+    --transition: 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0; min-height: 100dvh;
+    font-family: var(--font-sans); color: var(--text); background-color: var(--bg);
+    background-image:
+      linear-gradient(to right, rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56, 189, 248, 0.10), transparent),
+      radial-gradient(ellipse 60% 50% at 85% 115%, rgba(34, 197, 94, 0.05), transparent);
+    background-size: 64px 64px, 64px 64px, 100% 100%, 100% 100%;
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5; letter-spacing: -0.005em; overscroll-behavior-y: contain;
+  }
+  .shell { width: 100%; max-width: 860px; margin: 0 auto; padding: 24px 20px 64px; }
+
+  /* Top bar */
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 24px; }
+  .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+  .mark { width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #05121C; display: grid; place-items: center; box-shadow: 0 0 30px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.25); }
+  .mark svg { width: 24px; height: 24px; }
+  .brand .eyebrow { font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--accent); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 3px; }
+  .brand h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+  .icon-btn { display: inline-grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 11px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); cursor: pointer; transition: var(--transition); -webkit-tap-highlight-color: transparent; }
+  .icon-btn:hover { color: var(--text); border-color: var(--border-strong); background: var(--surface-hover); }
+  .icon-btn svg { width: 20px; height: 20px; stroke-width: 1.9; }
+
+  .back-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--text-dim); margin-bottom: 18px; transition: var(--transition); }
+  .back-link:hover { color: var(--accent); }
+  .back-link svg { width: 14px; height: 14px; stroke-width: 2; }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .panel-label { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+  .panel-label::before { content: ""; width: 6px; height: 6px; border-radius: 1px; background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+
+  label.field { display: block; margin-bottom: 14px; }
+  label.field:last-child { margin-bottom: 0; }
+  .field-name { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 7px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .field-name .hint { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); font-weight: 400; }
+
+  input[type="text"], input[type="password"], input[type="url"], select {
+    width: 100%; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+    background: var(--bg-elev); color: var(--text); font-family: var(--font-sans); font-size: 15px;
+    transition: var(--transition); -webkit-appearance: none; appearance: none;
+  }
+  input::placeholder { color: var(--text-dim); }
+  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+  select { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 6l4 4 4-4'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 38px; }
+  .input-mono { font-family: var(--font-mono); font-size: 13px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+
+  /* Segmented engine toggle */
+  .seg { display: flex; gap: 4px; padding: 4px; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 10px; margin-bottom: 14px; }
+  .seg button { flex: 1; padding: 9px 10px; border: none; background: transparent; color: var(--text-muted); font-family: var(--font-sans); font-size: 13px; font-weight: 500; border-radius: 7px; cursor: pointer; transition: var(--transition); -webkit-tap-highlight-color: transparent; }
+  .seg button.active { background: var(--accent-bg); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-border); }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; width: 100%; padding: 14px 18px; border: none; border-radius: var(--radius-sm); font-family: var(--font-sans); font-size: 15px; font-weight: 600; cursor: pointer; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #05121C; box-shadow: 0 8px 24px var(--accent-glow); transition: var(--transition); -webkit-tap-highlight-color: transparent; }
+  .btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 30px var(--accent-glow); }
+  .btn:active:not(:disabled) { transform: translateY(0); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
+  .btn svg { width: 18px; height: 18px; stroke-width: 2; }
+  .btn-ghost { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border-strong); box-shadow: none; padding: 10px 14px; font-size: 13px; font-weight: 500; width: auto; }
+  .btn-ghost:hover:not(:disabled) { color: var(--text); background: var(--surface-hover); transform: none; box-shadow: none; }
+  .btn-ghost svg { width: 15px; height: 15px; }
+
+  #settings { display: none; }
+  #settings.open { display: block; }
+  .key-note { font-size: 12px; color: var(--text-dim); line-height: 1.6; margin: 4px 0 0; }
+  .key-note a { color: var(--accent); }
+
+  #status { display: none; text-align: center; padding: 34px 20px; }
+  #status.show { display: block; }
+  .spinner { width: 42px; height: 42px; margin: 0 auto 18px; border-radius: 50%; border: 3px solid var(--border-strong); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #status .msg { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 6px; min-height: 22px; }
+  #status .timer { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+
+  .alert { display: none; padding: 13px 15px; border-radius: var(--radius-sm); font-size: 13.5px; line-height: 1.55; margin-bottom: 16px; }
+  .alert.show { display: block; }
+  .alert.error { background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.3); color: #FCA5A5; }
+  .alert .link-btn { color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; font: inherit; text-decoration: underline; }
+
+  /* Result */
+  #result { display: none; }
+  #result.show { display: block; }
+  .result-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
+  .thumb { width: 120px; aspect-ratio: 16/9; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); background: var(--bg-elev); }
+  .rh-body { min-width: 0; flex: 1; }
+  .result-title { margin: 0 0 6px; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.3; }
+  .result-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); letter-spacing: 0.02em; line-height: 1.7; }
+  .chip { display: inline-block; font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-border); margin-right: 6px; }
+
+  .result-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+  .view-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .view-bar .seg { margin-bottom: 0; flex-shrink: 0; }
+  .view-bar .seg button { padding: 7px 12px; font-size: 12px; }
+  .search-wrap { flex: 1; position: relative; }
+  .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--text-dim); pointer-events: none; }
+  #search { padding: 9px 12px 9px 33px; font-size: 13px; }
+
+  .transcript { max-height: 560px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 4px; background: var(--bg-elev); }
+  .transcript::-webkit-scrollbar { width: 10px; }
+  .transcript::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; border: 3px solid var(--bg-elev); }
+
+  .seg-row { display: flex; gap: 12px; padding: 8px 12px; border-radius: 6px; transition: background 120ms; }
+  .seg-row:hover { background: var(--surface); }
+  .seg-row.hidden { display: none; }
+  a.ts { flex-shrink: 0; font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--accent); text-decoration: none; padding: 2px 7px; border-radius: 5px; border: 1px solid var(--accent-border); background: var(--accent-bg); height: fit-content; white-space: nowrap; transition: var(--transition); }
+  a.ts:hover { background: var(--accent); color: #05121C; }
+  .seg-text { font-size: 14.5px; line-height: 1.65; color: var(--text); }
+  .seg-text mark { background: rgba(245, 158, 11, 0.3); color: var(--text); border-radius: 3px; padding: 0 2px; }
+  .plain-view .ts { display: none; }
+  .plain-view .seg-row { padding: 4px 12px; }
+
+  .empty { text-align: center; padding: 26px 16px; color: var(--text-dim); font-size: 13px; }
+  .empty svg { width: 30px; height: 30px; stroke-width: 1.5; opacity: 0.5; margin-bottom: 8px; }
+
+  /* History */
+  .hist-toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .hist-item { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-elev); margin-bottom: 8px; cursor: pointer; transition: var(--transition); }
+  .hist-item:hover { border-color: var(--accent-border); background: var(--surface-hover); }
+  .hist-thumb { width: 76px; aspect-ratio: 16/9; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--surface); }
+  .hist-body { min-width: 0; flex: 1; }
+  .hist-body h5 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .hist-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); letter-spacing: 0.03em; }
+  .hist-del { flex-shrink: 0; border: none; background: none; color: var(--text-dim); cursor: pointer; padding: 6px; border-radius: 6px; transition: var(--transition); }
+  .hist-del:hover { color: var(--accent); background: var(--accent-bg); }
+  .hist-del svg { width: 16px; height: 16px; stroke-width: 2; display: block; }
+
+  .footnote { margin-top: 26px; padding: 13px 18px; background: rgba(17,26,46,0.5); border: 1px solid rgba(148,163,184,0.14); border-radius: 999px; color: var(--text-muted); font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.02em; line-height: 1.5; display: flex; align-items: center; gap: 10px; }
+  .footnote svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--accent); stroke-width: 1.8; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--bg-elev); border: 1px solid var(--border-strong); color: var(--text); padding: 11px 18px; border-radius: 999px; font-size: 13px; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,0.5); opacity: 0; pointer-events: none; transition: var(--transition); z-index: 100; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 560px) {
+    .shell { padding: 18px 14px 48px; }
+    .result-head { flex-direction: column; }
+    .thumb { width: 100%; }
+    .row { flex-direction: column; }
+    .view-bar { flex-wrap: wrap; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+</style>
+</head>
+<body>
+<main class="shell">
+
+  <a class="back-link" href="../">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    返回工具箱
+  </a>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+          <path d="M4 6h16"/><path d="M4 10h16"/><path d="M4 14h10"/><path d="M4 18h13"/>
+        </svg>
+      </div>
+      <div>
+        <div class="eyebrow">// YT Transcript</div>
+        <h1>逐字稿擷取</h1>
+      </div>
+    </div>
+    <button class="icon-btn" id="settingsBtn" aria-label="設定" title="設定">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <!-- Settings -->
+  <section class="panel" id="settings">
+    <div class="panel-label">設定</div>
+    <label class="field">
+      <span class="field-name">字幕來源 API <span class="hint">原始字幕引擎，可自訂</span></span>
+      <input type="text" id="captionApi" class="input-mono" placeholder="https://youtube-transcript.ai" spellcheck="false">
+    </label>
+    <label class="field">
+      <span class="field-name">Gemini API 金鑰 <span class="hint">AI 轉錄用，存在本機</span></span>
+      <input type="password" id="apiKey" class="input-mono" placeholder="貼上你的 Gemini API key" autocomplete="off" spellcheck="false">
+    </label>
+    <label class="field">
+      <span class="field-name">Gemini 模型</span>
+      <input type="text" id="model" class="input-mono" list="modelList" placeholder="gemini-2.5-flash" spellcheck="false">
+      <datalist id="modelList">
+        <option value="gemini-2.5-flash">快速、免費額度高（建議）</option>
+        <option value="gemini-2.5-pro">最準、較慢</option>
+        <option value="gemini-2.5-flash-lite">最省最快</option>
+      </datalist>
+    </label>
+    <p class="key-note">
+      「原始字幕」直接向字幕來源 API 取回 YouTube 既有字幕，免金鑰。「AI 轉錄」由 Gemini 直接聽影片產生，適合沒有字幕的影片；金鑰只存在本機、直接送往 Google。
+      免費申請 Gemini 金鑰：<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>。
+    </p>
+    <div style="margin-top:14px;"><button class="btn btn-ghost" id="saveSettings" style="width:100%;">儲存設定</button></div>
+  </section>
+
+  <div class="alert" id="alert"></div>
+
+  <!-- Input -->
+  <section class="panel">
+    <div class="panel-label">擷取逐字稿</div>
+    <div class="seg" id="engineSeg">
+      <button data-engine="original" class="active">原始字幕 · 免金鑰</button>
+      <button data-engine="gemini">AI 轉錄 · Gemini</button>
+    </div>
+    <label class="field">
+      <span class="field-name">YouTube 網址</span>
+      <input type="url" id="url" class="input-mono" placeholder="https://www.youtube.com/watch?v=..." spellcheck="false" autocomplete="off">
+    </label>
+    <label class="field">
+      <span class="field-name">語言 <span class="hint" id="langHint">原始字幕：挑選字幕語言</span></span>
+      <select id="lang">
+        <option value="">自動（預設軌）</option>
+        <option value="zh-Hant">繁體中文</option>
+        <option value="zh-Hans">简体中文</option>
+        <option value="en">English</option>
+        <option value="ja">日本語</option>
+        <option value="ko">한국어</option>
+      </select>
+    </label>
+    <button class="btn" id="grabBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>
+      一鍵擷取
+    </button>
+  </section>
+
+  <!-- Loading -->
+  <section id="status">
+    <div class="spinner"></div>
+    <div class="msg" id="statusMsg">取得字幕中…</div>
+    <div class="timer" id="statusTimer">00:00</div>
+  </section>
+
+  <!-- Result -->
+  <section class="panel" id="result"></section>
+
+  <!-- History -->
+  <section class="panel">
+    <div class="panel-label">歷史記錄</div>
+    <div class="hist-toolbar">
+      <button class="btn-ghost" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>匯出 JSON</button>
+      <button class="btn-ghost" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 8l5-5 5 5"/><path d="M12 3v12"/></svg>匯入</button>
+      <input type="file" id="importFile" accept="application/json" hidden>
+    </div>
+    <div id="historyList"></div>
+  </section>
+
+  <div class="footnote">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+    <span>原始字幕需影片本身有字幕；沒有字幕時改用 AI 轉錄</span>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const LS = { captionApi: "yt.captionApi", key: "yt.apiKey", model: "yt.model", engine: "yt.engine", lang: "yt.lang", history: "yt.history" };
+  const DEFAULT_API = "https://youtube-transcript.ai";
+
+  // Restore (falling back to the recap tool's stored key/model if present)
+  $("captionApi").value = localStorage.getItem(LS.captionApi) || DEFAULT_API;
+  $("apiKey").value = localStorage.getItem(LS.key) || localStorage.getItem("vr.apiKey") || "";
+  $("model").value = localStorage.getItem(LS.model) || localStorage.getItem("vr.model") || "gemini-2.5-flash";
+  let engine = localStorage.getItem(LS.engine) || "original";
+  $("lang").value = localStorage.getItem(LS.lang) || "";
+  let currentView = "timestamp";
+  let currentRecord = null;
+
+  // Toast / alert
+  let toastTimer;
+  function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 2200); }
+  function showAlert(html) { const a = $("alert"); a.innerHTML = html; a.className = "alert show error"; }
+  function clearAlert() { $("alert").className = "alert"; }
+
+  // Settings
+  $("settingsBtn").addEventListener("click", () => {
+    $("settings").classList.toggle("open");
+    if ($("settings").classList.contains("open")) $("settings").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  $("saveSettings").addEventListener("click", () => {
+    localStorage.setItem(LS.captionApi, ($("captionApi").value.trim() || DEFAULT_API).replace(/\/+$/, ""));
+    localStorage.setItem(LS.key, $("apiKey").value.trim());
+    localStorage.setItem(LS.model, ($("model").value.trim() || "gemini-2.5-flash"));
+    $("settings").classList.remove("open");
+    toast("設定已儲存");
+  });
+
+  // Engine toggle
+  $("engineSeg").querySelectorAll("button").forEach((b) => {
+    if (b.dataset.engine === engine) b.classList.add("active"); else b.classList.remove("active");
+    b.addEventListener("click", () => {
+      engine = b.dataset.engine;
+      localStorage.setItem(LS.engine, engine);
+      $("engineSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+      $("langHint").textContent = engine === "gemini" ? "AI 轉錄：輸出語言" : "原始字幕：挑選字幕語言";
+    });
+  });
+  $("lang").addEventListener("change", (e) => localStorage.setItem(LS.lang, e.target.value));
+
+  // Helpers
+  function extractVideoId(input) {
+    if (!input) return null;
+    const s = input.trim();
+    const pats = [/(?:youtube\.com\/watch\?(?:.*&)?v=)([\w-]{11})/, /(?:youtu\.be\/)([\w-]{11})/, /(?:youtube\.com\/(?:embed|shorts|live|v)\/)([\w-]{11})/];
+    for (const p of pats) { const m = s.match(p); if (m) return m[1]; }
+    if (/^[\w-]{11}$/.test(s)) return s;
+    return null;
+  }
+  const thumbUrl = (id) => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad = (n) => String(n).padStart(2, "0");
+  function fmtTs(sec) { sec = Math.floor(sec); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60; return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`; }
+  function tsToSeconds(ts) { const p = ts.split(":").map((n) => parseInt(n, 10)); if (p.some(isNaN)) return null; if (p.length === 3) return p[0]*3600+p[1]*60+p[2]; if (p.length === 2) return p[0]*60+p[1]; return p[0]; }
+
+  // Parse "[m:ss] text" style body → {title, meta, segments:[{start,text}]}
+  function parseBody(text) {
+    const lines = text.split(/\r?\n/);
+    let title = "", meta = { lang: "", duration: "", words: "" };
+    const segments = [];
+    const tsRe = /^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s?(.*)$/;
+    let cur = null;
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      if (!title && /^#\s*Transcript:\s*/i.test(line)) { title = line.replace(/^#\s*Transcript:\s*/i, "").trim(); continue; }
+      const mLang = line.match(/Language:\s*([\w-]+)\s*·\s*Duration:\s*([\d:]+)\s*·\s*Words:\s*([\d,]+)/i);
+      if (mLang) { meta.lang = mLang[1]; meta.duration = mLang[2]; meta.words = mLang[3]; continue; }
+      const m = line.match(tsRe);
+      if (m) { cur = { start: tsToSeconds(m[1]), text: m[2] || "" }; segments.push(cur); }
+      else if (cur && line.trim()) { cur.text += (cur.text ? " " : "") + line.trim(); }
+    }
+    // Fallback: no timestamps at all → treat non-empty lines as one blob
+    if (!segments.length) {
+      const blob = lines.filter((l) => l.trim() && !/^#/.test(l) && !/^Source video:/i.test(l) && !/^Language:/i.test(l) && !/^Other available/i.test(l) && !/^To request/i.test(l)).join(" ").trim();
+      if (blob) segments.push({ start: null, text: blob });
+    }
+    return { title, meta, segments };
+  }
+
+  // Loading
+  let timerInt, msgInt, startTs;
+  const msgs = { original: ["取得字幕中…", "解析字幕軌…", "整理段落…"], gemini: ["上傳影片給 Gemini…", "聆聽並轉錄中…", "整理逐字稿…", "快好了…"] };
+  function startLoading(eng) {
+    $("status").classList.add("show"); $("result").classList.remove("show"); startTs = Date.now();
+    const list = msgs[eng] || msgs.original; let i = 0; $("statusMsg").textContent = list[0];
+    timerInt = setInterval(() => { const s = Math.floor((Date.now()-startTs)/1000); $("statusTimer").textContent = `${pad(Math.floor(s/60))}:${pad(s%60)}`; }, 500);
+    msgInt = setInterval(() => { i = (i+1)%list.length; $("statusMsg").textContent = list[i]; }, 3500);
+  }
+  function stopLoading() { clearInterval(timerInt); clearInterval(msgInt); $("status").classList.remove("show"); }
+
+  // Engines
+  async function fetchOriginal(videoId, lang) {
+    const base = (localStorage.getItem(LS.captionApi) || DEFAULT_API).replace(/\/+$/, "");
+    const url = `${base}/transcript/${videoId}.txt` + (lang ? `?lang=${encodeURIComponent(lang)}` : "");
+    let res;
+    try { res = await fetch(url, { headers: { "Accept": "text/plain" } }); }
+    catch (_) { throw new Error("連不到字幕服務，可能服務暫時中斷，或到設定換一個字幕來源 API。"); }
+    const body = await res.text();
+    if (!res.ok) {
+      if (res.status === 404) throw new Error("找不到這支影片的字幕（可能沒有字幕、私人或已關閉字幕）。__GEMINI__");
+      throw new Error(`字幕服務回應 ${res.status}，稍後再試或改用 AI 轉錄。__GEMINI__`);
+    }
+    const parsed = parseBody(body);
+    if (!parsed.segments.length) throw new Error("這支影片似乎沒有可用字幕。__GEMINI__");
+    return parsed;
+  }
+
+  async function fetchGemini(videoId, lang) {
+    const apiKey = ($("apiKey").value || localStorage.getItem(LS.key) || "").trim();
+    const model = ($("model").value.trim() || "gemini-2.5-flash");
+    if (!apiKey) { const e = new Error("AI 轉錄需要 Gemini 金鑰，請先到設定填入。"); e.openSettings = true; throw e; }
+    localStorage.setItem(LS.key, apiKey); localStorage.setItem(LS.model, model);
+    const L = lang ? langName(lang) : "影片原本的語言";
+    const prompt = `請將這支 YouTube 影片完整逐字轉錄成逐字稿，語言使用「${L}」。
+規則：
+- 依語意或大約每 10–15 秒切成一段，每段句首標上該段開始的時間戳，格式 [M:SS] 或 [H:MM:SS]（使用影片實際時間）。
+- 忠實轉錄口說內容，不要摘要、不要改寫、不要加註解。
+- 第一行可選擇性輸出「# Transcript: 影片標題」，其餘只輸出逐字稿本文，不要任何額外說明或 markdown 標記。`;
+    let res;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [ { fileData: { fileUri: `https://www.youtube.com/watch?v=${videoId}`, mimeType: "video/*" } }, { text: prompt } ] }],
+          generationConfig: { temperature: 0.2 }
+        })
+      });
+    } catch (_) { throw new Error("連不到 Gemini，請檢查網路。"); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { const em = (data.error && data.error.message) || `HTTP ${res.status}`; throw new Error(friendlyGemini(res.status, em)); }
+    if (data.promptFeedback && data.promptFeedback.blockReason) throw new Error("這支影片被 Gemini 擋下了（可能私人、年齡限制或內容因素）。");
+    const cand = data.candidates && data.candidates[0];
+    const text = cand && cand.content && cand.content.parts && cand.content.parts.map((p) => p.text || "").join("");
+    if (!text) throw new Error("Gemini 沒有回傳內容，影片可能太長或暫時無法讀取。");
+    const parsed = parseBody(text);
+    if (!parsed.segments.length) throw new Error("轉錄結果無法解析，請再試一次。");
+    if (cand.finishReason === "MAX_TOKENS") parsed.truncated = true;
+    return parsed;
+  }
+  function langName(code) { return ({ "zh-Hant":"繁體中文","zh-Hans":"简体中文","en":"English","ja":"日本語","ko":"한국어" })[code] || code; }
+  function friendlyGemini(status, msg) {
+    if (status === 400 && /API key not valid/i.test(msg)) return "Gemini 金鑰無效，請到設定確認。";
+    if (status === 403) return "金鑰沒有權限或未啟用 Gemini API。";
+    if (status === 429) return "已達 Gemini 免費額度上限，稍後再試。";
+    if (status >= 500) return "Google 伺服器暫時有問題，稍後再試。";
+    return msg;
+  }
+
+  // Main
+  async function grab() {
+    clearAlert();
+    const videoId = extractVideoId($("url").value);
+    if (!videoId) { showAlert("看不懂這個 YouTube 網址，請確認後再試。"); return; }
+    const lang = $("lang").value;
+    $("grabBtn").disabled = true; startLoading(engine);
+    try {
+      let parsed;
+      if (engine === "gemini") parsed = await fetchGemini(videoId, lang);
+      else parsed = await fetchOriginal(videoId, lang);
+
+      const record = {
+        id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+        videoId, url: `https://www.youtube.com/watch?v=${videoId}`,
+        engine, lang, createdAt: new Date().toISOString(),
+        title: parsed.title || "", meta: parsed.meta || {}, segments: parsed.segments,
+        truncated: !!parsed.truncated
+      };
+      saveHistory(record);
+      renderResult(record);
+      renderHistory();
+      $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      let msg = err.message || String(err);
+      let extra = "";
+      if (msg.includes("__GEMINI__")) { msg = msg.replace("__GEMINI__", ""); extra = ` <button class="link-btn" id="switchGemini">改用 AI 轉錄</button>`; }
+      showAlert(esc(msg.trim()) + extra);
+      if (err.openSettings) $("settings").classList.add("open");
+      const sg = $("switchGemini");
+      if (sg) sg.addEventListener("click", () => {
+        engine = "gemini"; localStorage.setItem(LS.engine, engine);
+        $("engineSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x.dataset.engine === "gemini"));
+        $("langHint").textContent = "AI 轉錄：輸出語言"; clearAlert(); grab();
+      });
+    } finally { stopLoading(); $("grabBtn").disabled = false; }
+  }
+
+  // Render result
+  function renderResult(rec) {
+    currentRecord = rec; currentView = "timestamp";
+    const segCount = rec.segments.length;
+    const words = rec.meta && rec.meta.words ? rec.meta.words : String(plainText(rec).replace(/\s+/g, rec.lang && rec.lang.startsWith("zh") ? "" : " ").length);
+    const engineLabel = rec.engine === "gemini" ? "AI 轉錄" : "原始字幕";
+    const metaBits = [];
+    if (rec.meta && rec.meta.duration) metaBits.push("長度 " + rec.meta.duration);
+    metaBits.push(segCount + " 段");
+    if (rec.meta && rec.meta.lang) metaBits.push("字幕 " + rec.meta.lang);
+
+    let h = `<div class="result-head">
+      <img class="thumb" src="${thumbUrl(rec.videoId)}" alt="" onerror="this.style.display='none'">
+      <div class="rh-body">
+        <h2 class="result-title">${esc(rec.title || "逐字稿")}</h2>
+        <div class="result-meta"><span class="chip">${engineLabel}</span>${esc(metaBits.join(" · "))}</div>
+      </div>
+    </div>`;
+
+    if (rec.truncated) h += `<div class="alert show error" style="margin-bottom:14px;">影片較長，AI 轉錄可能未完整（達輸出上限）。長片建議改用「原始字幕」。</div>`;
+
+    h += `<div class="result-actions">
+      <a class="btn-ghost" href="${esc(rec.url)}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>開啟影片</a>
+      <button class="btn-ghost" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>複製</button>
+      <button class="btn-ghost" id="dlTxt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>下載 .txt</button>
+      <button class="btn-ghost" id="dlSrt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M6 11h4"/><path d="M6 15h8"/></svg>下載 .srt</button>
+    </div>`;
+
+    h += `<div class="view-bar">
+      <div class="seg" id="viewSeg">
+        <button data-view="timestamp" class="active">時間戳</button>
+        <button data-view="plain">純文字</button>
+      </div>
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="search" class="input-mono" placeholder="搜尋逐字稿…" spellcheck="false" autocomplete="off">
+      </div>
+    </div>`;
+
+    h += `<div class="transcript" id="transcript">${renderSegments(rec, "")}</div>`;
+
+    const el = $("result"); el.innerHTML = h; el.classList.add("show");
+
+    $("copyBtn").addEventListener("click", () => copyText(rec));
+    $("dlTxt").addEventListener("click", () => download(`${safeName(rec)}.txt`, buildTxt(rec), "text/plain"));
+    $("dlSrt").addEventListener("click", () => download(`${safeName(rec)}.srt`, buildSrt(rec), "text/plain"));
+    $("viewSeg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      currentView = b.dataset.view;
+      $("viewSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+      $("transcript").classList.toggle("plain-view", currentView === "plain");
+      applySearch($("search").value);
+    }));
+    $("search").addEventListener("input", (e) => applySearch(e.target.value));
+  }
+
+  function renderSegments(rec, query) {
+    return rec.segments.map((s, i) => {
+      const ts = (s.start != null)
+        ? `<a class="ts" href="https://www.youtube.com/watch?v=${rec.videoId}&t=${Math.floor(s.start)}s" target="_blank" rel="noopener">${fmtTs(s.start)}</a>`
+        : `<span class="ts" style="opacity:.4">·</span>`;
+      return `<div class="seg-row" data-i="${i}"><div>${ts}</div><div class="seg-text">${esc(s.text)}</div></div>`;
+    }).join("");
+  }
+
+  function applySearch(q) {
+    q = (q || "").trim().toLowerCase();
+    const rows = $("transcript").querySelectorAll(".seg-row");
+    rows.forEach((row) => {
+      const i = +row.dataset.i;
+      const text = currentRecord.segments[i].text;
+      const hit = !q || text.toLowerCase().includes(q);
+      row.classList.toggle("hidden", !hit);
+      const tEl = row.querySelector(".seg-text");
+      if (q && hit) {
+        const re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
+        tEl.innerHTML = esc(text).replace(re, "<mark>$1</mark>");
+      } else { tEl.textContent = text; }
+    });
+  }
+
+  // Outputs
+  function plainText(rec) { return rec.segments.map((s) => s.text).join("\n"); }
+  function buildTxt(rec) {
+    let out = (rec.title ? `# ${rec.title}\n` : "") + `${rec.url}\n\n`;
+    out += rec.segments.map((s) => (s.start != null ? `[${fmtTs(s.start)}] ` : "") + s.text).join("\n");
+    return out;
+  }
+  function srtTime(sec) { sec = Math.max(0, sec); const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60); return `${pad(h)}:${pad(m)}:${pad(s)},000`; }
+  function buildSrt(rec) {
+    const segs = rec.segments.filter((s) => s.start != null);
+    if (!segs.length) return rec.segments.map((s) => s.text).join("\n");
+    return segs.map((s, i) => {
+      const start = s.start, end = (i < segs.length - 1) ? Math.max(start + 1, segs[i+1].start) : start + 4;
+      return `${i+1}\n${srtTime(start)} --> ${srtTime(end)}\n${s.text}\n`;
+    }).join("\n");
+  }
+  function copyText(rec) {
+    const text = currentView === "plain" ? plainText(rec) : buildTxt(rec);
+    navigator.clipboard.writeText(text).then(() => toast(currentView === "plain" ? "已複製純文字" : "已複製（含時間戳）"), () => toast("複製失敗"));
+  }
+  function safeName(rec) { return (rec.title || "transcript").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60) || "transcript"; }
+  function download(name, content, type) {
+    const blob = new Blob([content], { type: type + ";charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+    toast("已下載 " + name);
+  }
+
+  // History
+  function getHistory() { try { return JSON.parse(localStorage.getItem(LS.history) || "[]"); } catch (_) { return []; } }
+  function setHistory(a) { try { localStorage.setItem(LS.history, JSON.stringify(a)); } catch (_) { toast("儲存空間已滿，請匯出後清理"); } }
+  function saveHistory(rec) { const a = getHistory(); a.unshift(rec); setHistory(a.slice(0, 100)); }
+  function renderHistory() {
+    const a = getHistory(); const el = $("historyList");
+    if (!a.length) { el.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg><div>還沒有擷取記錄</div></div>`; return; }
+    el.innerHTML = a.map((r) => {
+      const t = r.title || "逐字稿";
+      const meta = new Date(r.createdAt).toLocaleDateString("zh-TW") + " · " + (r.engine === "gemini" ? "AI 轉錄" : "原始字幕") + " · " + (r.segments ? r.segments.length + " 段" : "");
+      return `<div class="hist-item" data-id="${esc(r.id)}">
+        <img class="hist-thumb" src="${thumbUrl(r.videoId)}" alt="" onerror="this.style.visibility='hidden'">
+        <div class="hist-body"><h5>${esc(t)}</h5><div class="hist-meta">${esc(meta)}</div></div>
+        <button class="hist-del" data-del="${esc(r.id)}" aria-label="刪除" title="刪除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+      </div>`;
+    }).join("");
+    el.querySelectorAll(".hist-item").forEach((it) => it.addEventListener("click", (e) => {
+      if (e.target.closest(".hist-del")) return;
+      const rec = getHistory().find((r) => r.id === it.dataset.id);
+      if (rec) { renderResult(rec); $("result").scrollIntoView({ behavior: "smooth", block: "start" }); }
+    }));
+    el.querySelectorAll(".hist-del").forEach((b) => b.addEventListener("click", (e) => {
+      e.stopPropagation(); setHistory(getHistory().filter((r) => r.id !== b.dataset.del)); renderHistory(); toast("已刪除");
+    }));
+  }
+
+  // Export / import
+  $("exportBtn").addEventListener("click", () => {
+    const a = getHistory(); if (!a.length) { toast("沒有記錄可匯出"); return; }
+    download(`yt-transcript-${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(a, null, 2), "application/json");
+  });
+  $("importBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const imp = JSON.parse(r.result); if (!Array.isArray(imp)) throw new Error();
+        const ex = getHistory(); const ids = new Set(ex.map((x) => x.id));
+        const merged = ex.concat(imp.filter((x) => x && x.id && !ids.has(x.id)));
+        merged.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setHistory(merged.slice(0, 100)); renderHistory(); toast("已匯入，共 " + getHistory().length + " 筆");
+      } catch (_) { toast("檔案格式不正確"); }
+    };
+    r.readAsText(f); e.target.value = "";
+  });
+
+  // Bind
+  $("grabBtn").addEventListener("click", grab);
+  $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") grab(); });
+  renderHistory();
+
+  if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+})();
+</script>
+</body>
+</html>
