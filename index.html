@@ -137,6 +137,36 @@
   .chip { display: inline-block; font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-border); margin-right: 6px; }
 
   .result-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .btn-sum { display: inline-flex; align-items: center; gap: 7px; padding: 10px 15px; border: none; border-radius: var(--radius-sm); font-family: var(--font-sans); font-size: 13px; font-weight: 600; cursor: pointer; color: #05121C; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); box-shadow: 0 6px 18px var(--accent-glow); transition: var(--transition); -webkit-tap-highlight-color: transparent; }
+  .btn-sum:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 24px var(--accent-glow); }
+  .btn-sum:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+  .btn-sum svg { width: 16px; height: 16px; stroke-width: 2; }
+  .sum-loading { text-align: center; padding: 22px; color: var(--text-muted); font-size: 13px; }
+  .report { margin: 4px 0 16px; padding: 16px; border: 1px solid var(--accent-border); border-radius: var(--radius-sm); background: linear-gradient(180deg, var(--accent-bg), transparent); }
+  .report-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .report-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--accent); }
+  .report-title { margin: 2px 0 8px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.3; }
+  .report .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .report .tag-chip { font-family: var(--font-mono); font-size: 10px; padding: 3px 9px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent-border); }
+  .report .tldr { background: var(--accent-bg); border: 1px solid var(--accent-border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px; font-size: 14.5px; line-height: 1.6; }
+  .report .tldr b { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
+  .report .sec { margin-bottom: 16px; }
+  .report .sec:last-child { margin-bottom: 0; }
+  .report .sec-title { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 10px; padding-bottom: 7px; border-bottom: 1px solid var(--border); }
+  .report .kp { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .report .kp:last-child { border-bottom: none; }
+  .report .kp-text { font-size: 14px; line-height: 1.6; }
+  .report .chapter { padding: 8px 0; border-bottom: 1px dashed var(--border); font-size: 13.5px; line-height: 1.6; }
+  .report .chapter:last-child { border-bottom: none; }
+  .report .chapter p { margin: 4px 0 0; color: var(--text-muted); }
+  .report .term { padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: 14px; line-height: 1.6; }
+  .report .term:last-child { border-bottom: none; }
+  .report .term b { color: var(--accent); }
+  .report ul.actions { margin: 0; padding: 0; list-style: none; }
+  .report ul.actions li { position: relative; padding: 7px 0 7px 22px; font-size: 14px; line-height: 1.55; border-bottom: 1px dashed var(--border); }
+  .report ul.actions li:last-child { border-bottom: none; }
+  .report ul.actions li::before { content: ""; position: absolute; left: 3px; top: 14px; width: 7px; height: 7px; border-radius: 2px; background: var(--green); }
+  .report .conclusion { font-size: 14px; line-height: 1.7; color: var(--text-muted); }
 
   .view-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .view-bar .seg { margin-bottom: 0; flex-shrink: 0; }
@@ -517,11 +547,14 @@
     if (rec.truncated) h += `<div class="alert show error" style="margin-bottom:14px;">影片較長，AI 轉錄可能未完整（達輸出上限）。長片建議改用「原始字幕」。</div>`;
 
     h += `<div class="result-actions">
+      <button class="btn-sum" id="summarizeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5 10.1 7.6z"/><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>重點整理</button>
       <a class="btn-ghost" href="${esc(rec.url)}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>開啟影片</a>
       <button class="btn-ghost" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>複製</button>
       <button class="btn-ghost" id="dlTxt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>下載 .txt</button>
       <button class="btn-ghost" id="dlSrt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M6 11h4"/><path d="M6 15h8"/></svg>下載 .srt</button>
     </div>`;
+
+    h += `<div id="summaryBox"></div>`;
 
     h += `<div class="view-bar">
       <div class="seg" id="viewSeg">
@@ -538,6 +571,8 @@
 
     const el = $("result"); el.innerHTML = h; el.classList.add("show");
 
+    $("summarizeBtn").addEventListener("click", () => summarize(rec));
+    renderSummary(rec);
     $("copyBtn").addEventListener("click", () => copyText(rec));
     $("dlTxt").addEventListener("click", () => download(`${safeName(rec)}.txt`, buildTxt(rec), "text/plain"));
     $("dlSrt").addEventListener("click", () => download(`${safeName(rec)}.srt`, buildSrt(rec), "text/plain"));
@@ -591,6 +626,89 @@
       return `${i+1}\n${srtTime(start)} --> ${srtTime(end)}\n${s.text}\n`;
     }).join("\n");
   }
+  // ── Gemini 重點整理（吃逐字稿文字，省 token）──
+  function safeJson(text) {
+    if (!text) return null;
+    try { return JSON.parse(text); } catch (_) {}
+    const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (m) { try { return JSON.parse(m[1]); } catch (_) {} }
+    const s = text.indexOf("{"), e = text.lastIndexOf("}");
+    if (s !== -1 && e > s) { try { return JSON.parse(text.slice(s, e + 1)); } catch (_) {} }
+    return null;
+  }
+
+  async function summarize(rec) {
+    const apiKey = ($("apiKey").value || localStorage.getItem(LS.key) || "").trim();
+    const model = ($("model").value.trim() || localStorage.getItem(LS.model) || "gemini-2.5-flash");
+    const box = $("summaryBox");
+    if (!apiKey) { showAlert("生成重點整理需要 Gemini 金鑰，請先到右上齒輪設定填入。"); $("settings").classList.add("open"); return; }
+    const btn = $("summarizeBtn"); if (btn) btn.disabled = true;
+    box.innerHTML = `<div class="sum-loading"><div class="spinner" style="width:28px;height:28px;margin:0 auto 10px;"></div>Gemini 正在整理重點…</div>`;
+    box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const L = rec.lang ? langName(rec.lang) : "繁體中文";
+    const transcript = rec.segments.map((s) => (s.start != null ? `[${fmtTs(s.start)}] ` : "") + s.text).join("\n");
+    const prompt = `以下是一支 YouTube 影片的逐字稿，請用「${L}」整理成一份結構化重點報告。
+只輸出符合下列結構的 JSON，不要任何額外文字或 markdown 標記：
+{ "title":"影片主題","tldr":"一到兩句話總結","topic_tags":["3-5 個主題標籤"],"key_points":[{"timestamp":"M:SS","point":"一個關鍵重點，完整且可獨立理解"}],"chapters":[{"timestamp":"M:SS","heading":"章節標題","summary":"2-3 句摘要"}],"terms":[{"term":"重要名詞","definition":"簡短解釋"}],"action_items":["觀眾看完可採取的行動或值得記住的結論"],"conclusion":"整體總結" }
+要求：key_points 至少 5 點、依時間順序排列，timestamp 沿用逐字稿中的時間；terms 若無可為空陣列；忠於逐字稿內容、不要杜撰；全部使用「${L}」。
+
+逐字稿：
+${transcript}`;
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.3 } })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(friendlyGemini(res.status, (data.error && data.error.message) || `HTTP ${res.status}`));
+      const cand = data.candidates && data.candidates[0];
+      const text = cand && cand.content && cand.content.parts && cand.content.parts.map((p) => p.text || "").join("");
+      const parsed = safeJson(text);
+      if (!parsed) throw new Error("回傳格式無法解析，請再試一次或換個模型。");
+      rec.summary = parsed;
+      localStorage.setItem(LS.model, model);
+      const arr = getHistory(); const i = arr.findIndex((r) => r.id === rec.id);
+      if (i >= 0) { arr[i].summary = parsed; setHistory(arr); }
+      renderSummary(rec);
+      $("summaryBox").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      box.innerHTML = `<div class="alert show error" style="margin:0;">${esc(err.message || String(err))}</div>`;
+    } finally { if (btn) btn.disabled = false; }
+  }
+
+  function renderSummary(rec) {
+    const box = $("summaryBox"); if (!box) return;
+    const d = rec.summary; if (!d) { box.innerHTML = ""; return; }
+    const vid = rec.videoId;
+    const tsLink = (t) => { if (!t) return ""; const sec = tsToSeconds(String(t)); return sec != null ? `<a class="ts" href="https://www.youtube.com/watch?v=${vid}&t=${sec}s" target="_blank" rel="noopener">${esc(t)}</a>` : `<span class="ts" style="opacity:.5">${esc(t)}</span>`; };
+    let h = `<div class="report"><div class="report-bar"><span class="report-badge">✦ 重點整理</span><button class="btn-ghost" id="copySum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>複製 Markdown</button></div>`;
+    if (d.title) h += `<h3 class="report-title">${esc(d.title)}</h3>`;
+    if (Array.isArray(d.topic_tags) && d.topic_tags.length) h += `<div class="tags">${d.topic_tags.map((t) => `<span class="tag-chip">${esc(t)}</span>`).join("")}</div>`;
+    if (d.tldr) h += `<div class="tldr"><b>一句話總結</b>${esc(d.tldr)}</div>`;
+    if (Array.isArray(d.key_points) && d.key_points.length) h += `<div class="sec"><div class="sec-title">重點</div>` + d.key_points.map((k) => `<div class="kp">${k.timestamp ? tsLink(k.timestamp) : '<span class="ts" style="opacity:.4">·</span>'}<div class="kp-text">${esc(k.point)}</div></div>`).join("") + `</div>`;
+    if (Array.isArray(d.chapters) && d.chapters.length) h += `<div class="sec"><div class="sec-title">章節</div>` + d.chapters.map((c) => `<div class="chapter">${tsLink(c.timestamp)} <b>${esc(c.heading)}</b><p>${esc(c.summary)}</p></div>`).join("") + `</div>`;
+    if (Array.isArray(d.terms) && d.terms.length) h += `<div class="sec"><div class="sec-title">關鍵名詞</div>` + d.terms.map((t) => `<div class="term"><b>${esc(t.term)}</b>　${esc(t.definition)}</div>`).join("") + `</div>`;
+    if (Array.isArray(d.action_items) && d.action_items.length) h += `<div class="sec"><div class="sec-title">重點結論 / 行動</div><ul class="actions">` + d.action_items.map((a) => `<li>${esc(a)}</li>`).join("") + `</ul></div>`;
+    if (d.conclusion) h += `<div class="sec"><div class="sec-title">總結</div><div class="conclusion">${esc(d.conclusion)}</div></div>`;
+    h += `</div>`;
+    box.innerHTML = h;
+    const cs = $("copySum"); if (cs) cs.addEventListener("click", () => copySummaryMd(rec));
+  }
+
+  function copySummaryMd(rec) {
+    const d = rec.summary; if (!d) return;
+    let m = `# ${d.title || "重點整理"}\n\n> ${rec.url}\n\n`;
+    if (d.tldr) m += `**TL;DR：** ${d.tldr}\n\n`;
+    if (d.topic_tags && d.topic_tags.length) m += d.topic_tags.map((t) => `\`${t}\``).join(" ") + "\n\n";
+    if (d.key_points && d.key_points.length) { m += `## 重點\n\n`; d.key_points.forEach((k) => { m += `- ${k.timestamp ? "**[" + k.timestamp + "]** " : ""}${k.point}\n`; }); m += "\n"; }
+    if (d.chapters && d.chapters.length) { m += `## 章節\n\n`; d.chapters.forEach((c) => { m += `### ${c.timestamp ? c.timestamp + " " : ""}${c.heading}\n${c.summary}\n\n`; }); }
+    if (d.terms && d.terms.length) { m += `## 關鍵名詞\n\n`; d.terms.forEach((t) => { m += `- **${t.term}**：${t.definition}\n`; }); m += "\n"; }
+    if (d.action_items && d.action_items.length) { m += `## 重點結論 / 行動\n\n`; d.action_items.forEach((a) => { m += `- ${a}\n`; }); m += "\n"; }
+    if (d.conclusion) m += `## 總結\n\n${d.conclusion}\n`;
+    navigator.clipboard.writeText(m).then(() => toast("已複製重點整理"), () => toast("複製失敗"));
+  }
+
   function copyText(rec) {
     const text = currentView === "plain" ? plainText(rec) : buildTxt(rec);
     navigator.clipboard.writeText(text).then(() => toast(currentView === "plain" ? "已複製純文字" : "已複製（含時間戳）"), () => toast("複製失敗"));
