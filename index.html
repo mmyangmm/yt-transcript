@@ -154,6 +154,7 @@
   .report .sec:last-child { margin-bottom: 0; }
   .report .sec-title { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 10px; padding-bottom: 7px; border-bottom: 1px solid var(--border); }
   .report .kp { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+  .report .kp-dot { flex-shrink: 0; width: 6px; height: 6px; margin-top: 8px; border-radius: 2px; background: var(--accent); }
   .report .kp:last-child { border-bottom: none; }
   .report .kp-text { font-size: 14px; line-height: 1.6; }
   .report .chapter { padding: 8px 0; border-bottom: 1px dashed var(--border); font-size: 13.5px; line-height: 1.6; }
@@ -167,6 +168,10 @@
   .report ul.actions li:last-child { border-bottom: none; }
   .report ul.actions li::before { content: ""; position: absolute; left: 3px; top: 14px; width: 7px; height: 7px; border-radius: 2px; background: var(--green); }
   .report .conclusion { font-size: 14px; line-height: 1.7; color: var(--text-muted); }
+  .report .overview { font-size: 14.5px; line-height: 1.7; }
+  .report .diagram { display: flex; justify-content: center; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elev); overflow-x: auto; }
+  .report .diagram svg { max-width: 100%; height: auto; }
+  .report .diagram-loading { color: var(--text-muted); font-size: 12px; text-align: center; padding: 18px; }
   .tx-details { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elev); }
   .tx-summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--text-muted); -webkit-tap-highlight-color: transparent; }
   .tx-summary::-webkit-details-marker { display: none; }
@@ -461,8 +466,16 @@
       if (res.status === 404) throw new Error("找不到這支影片的字幕（可能沒有字幕、私人或已關閉字幕）。__GEMINI__");
       throw new Error(`字幕服務回應 ${res.status}，稍後再試或改用 AI 轉錄。__GEMINI__`);
     }
+    // Some caption services return HTTP 200 with a "no captions" notice instead of a 404.
+    if (/^#\s*No captions available/i.test(body) || /no auto-generated captions/i.test(body) || /transcript cannot be extracted/i.test(body)) {
+      throw new Error("這支影片沒有字幕。__GEMINI__");
+    }
     const parsed = parseBody(body);
     if (!parsed.segments.length) throw new Error("這支影片似乎沒有可用字幕。__GEMINI__");
+    // If parsing collapsed everything into a single short blob, the body was likely a notice, not a transcript.
+    if (parsed.segments.length === 1 && parsed.segments[0].start == null && parsed.segments[0].text.length < 400) {
+      throw new Error("沒有取得有效逐字稿。__GEMINI__");
+    }
     return parsed;
   }
 
@@ -526,7 +539,17 @@
     try {
       let parsed;
       if (engine === "gemini") parsed = await fetchGemini(videoId, lang);
-      else parsed = await fetchOriginal(videoId, lang);
+      else {
+        try { parsed = await fetchOriginal(videoId, lang); }
+        catch (e) {
+          // In the recap flow, if captions are unavailable, silently fall back to Gemini watching the video.
+          const k = ($("apiKey").value || localStorage.getItem(LS.key) || "").trim();
+          if (autoSummarize && /__GEMINI__/.test(e.message || "") && k) {
+            $("statusMsg").textContent = "這支影片沒有字幕，改用 Gemini 直接聽影片…";
+            parsed = await fetchGemini(videoId, lang);
+          } else { throw e; }
+        }
+      }
 
       const record = {
         id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
@@ -593,13 +616,8 @@
         <div class="tx-tools">
           <button class="btn-ghost" id="copyBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>複製</button>
           <button class="btn-ghost" id="dlTxt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>下載 .txt</button>
-          <button class="btn-ghost" id="dlSrt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M6 11h4"/><path d="M6 15h8"/></svg>下載 .srt</button>
         </div>
         <div class="view-bar">
-          <div class="seg" id="viewSeg">
-            <button data-view="timestamp" class="active">時間戳</button>
-            <button data-view="plain">純文字</button>
-          </div>
           <div class="search-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
             <input type="text" id="search" class="input-mono" placeholder="搜尋逐字稿…" spellcheck="false" autocomplete="off">
@@ -615,22 +633,12 @@
     renderSummary(rec);
     $("copyBtn").addEventListener("click", () => copyText(rec));
     $("dlTxt").addEventListener("click", () => download(`${safeName(rec)}.txt`, buildTxt(rec), "text/plain"));
-    $("dlSrt").addEventListener("click", () => download(`${safeName(rec)}.srt`, buildSrt(rec), "text/plain"));
-    $("viewSeg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-      currentView = b.dataset.view;
-      $("viewSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
-      $("transcript").classList.toggle("plain-view", currentView === "plain");
-      applySearch($("search").value);
-    }));
     $("search").addEventListener("input", (e) => applySearch(e.target.value));
   }
 
   function renderSegments(rec, query) {
     return rec.segments.map((s, i) => {
-      const ts = (s.start != null)
-        ? `<a class="ts" href="https://www.youtube.com/watch?v=${rec.videoId}&t=${Math.floor(s.start)}s" target="_blank" rel="noopener">${fmtTs(s.start)}</a>`
-        : `<span class="ts" style="opacity:.4">·</span>`;
-      return `<div class="seg-row" data-i="${i}"><div>${ts}</div><div class="seg-text">${esc(s.text)}</div></div>`;
+      return `<div class="seg-row" data-i="${i}"><div class="seg-text">${esc(s.text)}</div></div>`;
     }).join("");
   }
 
@@ -654,7 +662,7 @@
   function plainText(rec) { return rec.segments.map((s) => s.text).join("\n"); }
   function buildTxt(rec) {
     let out = (rec.title ? `# ${rec.title}\n` : "") + `${rec.url}\n\n`;
-    out += rec.segments.map((s) => (s.start != null ? `[${fmtTs(s.start)}] ` : "") + s.text).join("\n");
+    out += rec.segments.map((s) => s.text).join("\n");
     return out;
   }
   function srtTime(sec) { sec = Math.max(0, sec); const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60); return `${pad(h)}:${pad(m)}:${pad(s)},000`; }
@@ -686,11 +694,25 @@
     box.innerHTML = `<div class="sum-loading"><div class="spinner" style="width:28px;height:28px;margin:0 auto 10px;"></div>Gemini 正在整理重點…</div>`;
     box.scrollIntoView({ behavior: "smooth", block: "nearest" });
     const L = rec.lang ? langName(rec.lang) : "繁體中文";
-    const transcript = rec.segments.map((s) => (s.start != null ? `[${fmtTs(s.start)}] ` : "") + s.text).join("\n");
-    const prompt = `以下是一支 YouTube 影片的逐字稿，請用「${L}」整理成一份結構化重點報告。
+    const transcript = rec.segments.map((s) => s.text).join("\n");
+    const prompt = `以下是一支 YouTube 影片的逐字稿。請用「${L}」把它統整成一份**結構化重點報告**，目標是讓讀者不看影片也能完整掌握內容、節省時間。請深入歸納脈絡、重點與因果關係，做真正的整理與統整，而不是逐句摘要或簡短概述。
 只輸出符合下列結構的 JSON，不要任何額外文字或 markdown 標記：
-{ "title":"影片主題","tldr":"一到兩句話總結","topic_tags":["3-5 個主題標籤"],"key_points":[{"timestamp":"M:SS","point":"一個關鍵重點，完整且可獨立理解"}],"chapters":[{"timestamp":"M:SS","heading":"章節標題","summary":"2-3 句摘要"}],"terms":[{"term":"重要名詞","definition":"簡短解釋"}],"action_items":["觀眾看完可採取的行動或值得記住的結論"],"conclusion":"整體總結" }
-要求：key_points 至少 5 點、依時間順序排列，timestamp 沿用逐字稿中的時間；terms 若無可為空陣列；忠於逐字稿內容、不要杜撰；全部使用「${L}」。
+{
+ "title":"影片主題",
+ "tldr":"一句話總結（40字內）",
+ "topic_tags":["3-5 個主題標籤"],
+ "overview":"導讀概述，3-5 句：影片在談什麼、切入角度、以及整體結論",
+ "key_points":["關鍵重點，完整且可獨立理解，每點 2-3 句"],
+ "chapters":[{"heading":"段落標題","summary":"該段落的重點統整，2-4 句"}],
+ "terms":[{"term":"重要名詞","definition":"簡短解釋"}],
+ "insights":["值得記住的洞察、結論或可採取的行動，需經過歸納，不要照抄原句"],
+ "conclusion":"整體總結，2-4 句",
+ "diagram":{"type":"flow","nodes":[{"id":"n1","label":"節點文字（12字內）"}],"edges":[{"from":"n1","to":"n2","label":"選填關係"}]}
+}
+要求：
+- key_points 至少 6 點；chapters 依內容多寡 3-8 個；皆依內容邏輯順序排列。
+- diagram 用 6-10 個節點畫出影片的主題結構或論述流程（中心主題 → 主要面向 → 重點），node id 用 n1、n2…，label 精簡（12 字內），edges 連出邏輯或因果關係。
+- terms、insights 若無可為空陣列；忠於逐字稿、不要杜撰；全部使用「${L}」。
 
 逐字稿：
 ${transcript}`;
@@ -717,22 +739,62 @@ ${transcript}`;
     } finally { if (btn) btn.disabled = false; }
   }
 
+  // 示意圖（Mermaid，按需載入）
+  let mermaidPromise = null;
+  function ensureMermaid() {
+    if (window.mermaid) return Promise.resolve(window.mermaid);
+    if (mermaidPromise) return mermaidPromise;
+    mermaidPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
+      s.onload = () => {
+        try { window.mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict", flowchart: { useMaxWidth: true, htmlLabels: true, curve: "basis" } }); } catch (_) {}
+        resolve(window.mermaid);
+      };
+      s.onerror = () => reject(new Error("mermaid load failed"));
+      document.head.appendChild(s);
+    });
+    return mermaidPromise;
+  }
+  function buildMermaid(dg) {
+    if (!dg || !Array.isArray(dg.nodes) || !dg.nodes.length) return null;
+    const cleanId = (s) => String(s || "").replace(/[^A-Za-z0-9_]/g, "").slice(0, 20) || "n";
+    const cleanLabel = (s) => String(s || "").replace(/["`|<>]/g, "").replace(/[\[\]{}()]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40) || "…";
+    const ids = new Set();
+    const lines = ["graph TD"];
+    dg.nodes.forEach((n) => { const id = cleanId(n.id); if (!id || ids.has(id)) return; ids.add(id); lines.push(`  ${id}["${cleanLabel(n.label)}"]`); });
+    if (ids.size < 2) return null;
+    (dg.edges || []).forEach((e) => { const f = cleanId(e && e.from), t = cleanId(e && e.to); if (f && t && ids.has(f) && ids.has(t)) { const lbl = e.label ? `|"${cleanLabel(e.label)}"|` : ""; lines.push(`  ${f} -->${lbl} ${t}`); } });
+    return lines.join("\n");
+  }
+  function renderDiagram(dg) {
+    const code = buildMermaid(dg);
+    const holder = $("diagramHolder"); if (!holder) return;
+    if (!code) { const sec = holder.closest(".sec"); if (sec) sec.remove(); return; }
+    ensureMermaid()
+      .then((m) => m.render("mmd_" + Date.now().toString(36), code))
+      .then(({ svg }) => { const el = $("diagramHolder"); if (el) el.innerHTML = svg; })
+      .catch(() => { const el = $("diagramHolder"); const sec = el && el.closest(".sec"); if (sec) sec.remove(); });
+  }
+
   function renderSummary(rec) {
     const box = $("summaryBox"); if (!box) return;
     const d = rec.summary; if (!d) { box.innerHTML = ""; return; }
-    const vid = rec.videoId;
-    const tsLink = (t) => { if (!t) return ""; const sec = tsToSeconds(String(t)); return sec != null ? `<a class="ts" href="https://www.youtube.com/watch?v=${vid}&t=${sec}s" target="_blank" rel="noopener">${esc(t)}</a>` : `<span class="ts" style="opacity:.5">${esc(t)}</span>`; };
     let h = `<div class="report"><div class="report-bar"><span class="report-badge">✦ 重點整理</span><button class="btn-ghost" id="copySum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>複製 Markdown</button></div>`;
     if (d.title) h += `<h3 class="report-title">${esc(d.title)}</h3>`;
     if (Array.isArray(d.topic_tags) && d.topic_tags.length) h += `<div class="tags">${d.topic_tags.map((t) => `<span class="tag-chip">${esc(t)}</span>`).join("")}</div>`;
     if (d.tldr) h += `<div class="tldr"><b>一句話總結</b>${esc(d.tldr)}</div>`;
-    if (Array.isArray(d.key_points) && d.key_points.length) h += `<div class="sec"><div class="sec-title">重點</div>` + d.key_points.map((k) => `<div class="kp">${k.timestamp ? tsLink(k.timestamp) : '<span class="ts" style="opacity:.4">·</span>'}<div class="kp-text">${esc(k.point)}</div></div>`).join("") + `</div>`;
-    if (Array.isArray(d.chapters) && d.chapters.length) h += `<div class="sec"><div class="sec-title">章節</div>` + d.chapters.map((c) => `<div class="chapter">${tsLink(c.timestamp)} <b>${esc(c.heading)}</b><p>${esc(c.summary)}</p></div>`).join("") + `</div>`;
+    if (d.overview) h += `<div class="sec"><div class="sec-title">導讀</div><div class="overview">${esc(d.overview)}</div></div>`;
+    if (d.diagram && Array.isArray(d.diagram.nodes) && d.diagram.nodes.length) h += `<div class="sec"><div class="sec-title">示意圖</div><div class="diagram" id="diagramHolder"><div class="diagram-loading"><div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>生成示意圖…</div></div></div>`;
+    if (Array.isArray(d.key_points) && d.key_points.length) h += `<div class="sec"><div class="sec-title">重點</div>` + d.key_points.map((k) => `<div class="kp"><span class="kp-dot"></span><div class="kp-text">${esc(typeof k === "string" ? k : (k && k.point) || "")}</div></div>`).join("") + `</div>`;
+    if (Array.isArray(d.chapters) && d.chapters.length) h += `<div class="sec"><div class="sec-title">章節</div>` + d.chapters.map((c) => `<div class="chapter"><b>${esc(c.heading)}</b><p>${esc(c.summary)}</p></div>`).join("") + `</div>`;
     if (Array.isArray(d.terms) && d.terms.length) h += `<div class="sec"><div class="sec-title">關鍵名詞</div>` + d.terms.map((t) => `<div class="term"><b>${esc(t.term)}</b>　${esc(t.definition)}</div>`).join("") + `</div>`;
-    if (Array.isArray(d.action_items) && d.action_items.length) h += `<div class="sec"><div class="sec-title">重點結論 / 行動</div><ul class="actions">` + d.action_items.map((a) => `<li>${esc(a)}</li>`).join("") + `</ul></div>`;
+    const acts = (Array.isArray(d.insights) && d.insights.length) ? d.insights : (Array.isArray(d.action_items) ? d.action_items : []);
+    if (acts.length) h += `<div class="sec"><div class="sec-title">洞察 / 重點結論</div><ul class="actions">` + acts.map((a) => `<li>${esc(a)}</li>`).join("") + `</ul></div>`;
     if (d.conclusion) h += `<div class="sec"><div class="sec-title">總結</div><div class="conclusion">${esc(d.conclusion)}</div></div>`;
     h += `</div>`;
     box.innerHTML = h;
+    if (d.diagram && Array.isArray(d.diagram.nodes) && d.diagram.nodes.length) renderDiagram(d.diagram);
     const cs = $("copySum"); if (cs) cs.addEventListener("click", () => copySummaryMd(rec));
   }
 
@@ -741,17 +803,20 @@ ${transcript}`;
     let m = `# ${d.title || "重點整理"}\n\n> ${rec.url}\n\n`;
     if (d.tldr) m += `**TL;DR：** ${d.tldr}\n\n`;
     if (d.topic_tags && d.topic_tags.length) m += d.topic_tags.map((t) => `\`${t}\``).join(" ") + "\n\n";
-    if (d.key_points && d.key_points.length) { m += `## 重點\n\n`; d.key_points.forEach((k) => { m += `- ${k.timestamp ? "**[" + k.timestamp + "]** " : ""}${k.point}\n`; }); m += "\n"; }
-    if (d.chapters && d.chapters.length) { m += `## 章節\n\n`; d.chapters.forEach((c) => { m += `### ${c.timestamp ? c.timestamp + " " : ""}${c.heading}\n${c.summary}\n\n`; }); }
+    if (d.overview) m += `## 導讀\n\n${d.overview}\n\n`;
+    const dgCode = buildMermaid(d.diagram);
+    if (dgCode) m += `## 示意圖\n\n\`\`\`mermaid\n${dgCode}\n\`\`\`\n\n`;
+    if (d.key_points && d.key_points.length) { m += `## 重點\n\n`; d.key_points.forEach((k) => { m += `- ${typeof k === "string" ? k : (k && k.point) || ""}\n`; }); m += "\n"; }
+    if (d.chapters && d.chapters.length) { m += `## 章節\n\n`; d.chapters.forEach((c) => { m += `### ${c.heading}\n${c.summary}\n\n`; }); }
     if (d.terms && d.terms.length) { m += `## 關鍵名詞\n\n`; d.terms.forEach((t) => { m += `- **${t.term}**：${t.definition}\n`; }); m += "\n"; }
-    if (d.action_items && d.action_items.length) { m += `## 重點結論 / 行動\n\n`; d.action_items.forEach((a) => { m += `- ${a}\n`; }); m += "\n"; }
+    const acts = (Array.isArray(d.insights) && d.insights.length) ? d.insights : (Array.isArray(d.action_items) ? d.action_items : []);
+    if (acts.length) { m += `## 洞察 / 重點結論\n\n`; acts.forEach((a) => { m += `- ${a}\n`; }); m += "\n"; }
     if (d.conclusion) m += `## 總結\n\n${d.conclusion}\n`;
     navigator.clipboard.writeText(m).then(() => toast("已複製重點整理"), () => toast("複製失敗"));
   }
 
   function copyText(rec) {
-    const text = currentView === "plain" ? plainText(rec) : buildTxt(rec);
-    navigator.clipboard.writeText(text).then(() => toast(currentView === "plain" ? "已複製純文字" : "已複製（含時間戳）"), () => toast("複製失敗"));
+    navigator.clipboard.writeText(plainText(rec)).then(() => toast("已複製逐字稿"), () => toast("複製失敗"));
   }
   function safeName(rec) { return (rec.title || "transcript").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60) || "transcript"; }
   function download(name, content, type) {
