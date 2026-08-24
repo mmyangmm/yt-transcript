@@ -348,7 +348,7 @@
 
   <div class="footnote">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-    <span>先取得字幕再用 Gemini 整理重點；沒有字幕時改用 AI 轉錄</span>
+    <span>只處理有字幕的影片；沒有字幕會顯示「未提供字幕」</span>
   </div>
 </main>
 
@@ -463,18 +463,18 @@
     catch (_) { throw new Error("連不到字幕服務，可能服務暫時中斷，或到設定換一個字幕來源 API。"); }
     const body = await res.text();
     if (!res.ok) {
-      if (res.status === 404) throw new Error("找不到這支影片的字幕（可能沒有字幕、私人或已關閉字幕）。__GEMINI__");
-      throw new Error(`字幕服務回應 ${res.status}，稍後再試或改用 AI 轉錄。__GEMINI__`);
+      if (res.status === 404) throw new Error("未提供字幕");
+      throw new Error(`字幕服務回應 ${res.status}，稍後再試。`);
     }
     // Some caption services return HTTP 200 with a "no captions" notice instead of a 404.
     if (/^#\s*No captions available/i.test(body) || /no auto-generated captions/i.test(body) || /transcript cannot be extracted/i.test(body)) {
-      throw new Error("這支影片沒有字幕。__GEMINI__");
+      throw new Error("未提供字幕");
     }
     const parsed = parseBody(body);
-    if (!parsed.segments.length) throw new Error("這支影片似乎沒有可用字幕。__GEMINI__");
+    if (!parsed.segments.length) throw new Error("未提供字幕");
     // If parsing collapsed everything into a single short blob, the body was likely a notice, not a transcript.
     if (parsed.segments.length === 1 && parsed.segments[0].start == null && parsed.segments[0].text.length < 400) {
-      throw new Error("沒有取得有效逐字稿。__GEMINI__");
+      throw new Error("未提供字幕");
     }
     return parsed;
   }
@@ -539,17 +539,7 @@
     try {
       let parsed;
       if (engine === "gemini") parsed = await fetchGemini(videoId, lang);
-      else {
-        try { parsed = await fetchOriginal(videoId, lang); }
-        catch (e) {
-          // In the recap flow, if captions are unavailable, silently fall back to Gemini watching the video.
-          const k = ($("apiKey").value || localStorage.getItem(LS.key) || "").trim();
-          if (autoSummarize && /__GEMINI__/.test(e.message || "") && k) {
-            $("statusMsg").textContent = "這支影片沒有字幕，改用 Gemini 直接聽影片…";
-            parsed = await fetchGemini(videoId, lang);
-          } else { throw e; }
-        }
-      }
+      else parsed = await fetchOriginal(videoId, lang);
 
       const record = {
         id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
