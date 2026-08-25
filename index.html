@@ -124,6 +124,7 @@
   .alert { display: none; padding: 13px 15px; border-radius: var(--radius-sm); font-size: 13.5px; line-height: 1.55; margin-bottom: 16px; }
   .alert.show { display: block; }
   .alert.error { background: rgba(239, 68, 68, 0.10); border: 1px solid rgba(239, 68, 68, 0.3); color: #FCA5A5; }
+  .alert.info { background: rgba(56, 189, 248, 0.10); border: 1px solid rgba(56, 189, 248, 0.3); color: #9DD9F7; }
   .alert .link-btn { color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; font: inherit; text-decoration: underline; }
 
   /* Result */
@@ -143,7 +144,10 @@
   .btn-sum svg { width: 16px; height: 16px; stroke-width: 2; }
   .sum-loading { text-align: center; padding: 22px; color: var(--text-muted); font-size: 13px; }
   .report { margin: 4px 0 16px; padding: 16px; border: 1px solid var(--accent-border); border-radius: var(--radius-sm); background: linear-gradient(180deg, var(--accent-bg), transparent); }
-  .report-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .report-bar { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-bottom: 12px; }
+  .report-bar .btn-ghost { margin-left: auto; }
+  .report-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
+  .sum-timer { font-family: var(--font-mono); color: var(--accent); }
   .report-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--accent); }
   .report-title { margin: 2px 0 8px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.3; }
   .report .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
@@ -529,6 +533,15 @@
     clearAlert();
     const videoId = extractVideoId($("url").value);
     if (!videoId) { showAlert("看不懂這個 YouTube 網址，請確認後再試。"); return; }
+    // If this video is already in history, load the existing result instead of analyzing again.
+    const existing = getHistory().find((r) => r.videoId === videoId);
+    if (existing) {
+      renderResult(existing);
+      renderHistory();
+      const a = $("alert"); a.innerHTML = "此影片已在歷史紀錄，已直接載入既有結果（未重新分析）。"; a.className = "alert show info";
+      $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     // For the recap flow, a Gemini key is required up front.
     if (autoSummarize) {
       const k = ($("apiKey").value || localStorage.getItem(LS.key) || "").trim();
@@ -681,8 +694,10 @@
     const box = $("summaryBox");
     if (!apiKey) { showAlert("生成重點整理需要 Gemini 金鑰，請先到右上齒輪設定填入。"); $("settings").classList.add("open"); return; }
     const btn = $("summarizeBtn"); if (btn) btn.disabled = true;
-    box.innerHTML = `<div class="sum-loading"><div class="spinner" style="width:28px;height:28px;margin:0 auto 10px;"></div>Gemini 正在整理重點…</div>`;
+    box.innerHTML = `<div class="sum-loading"><div class="spinner" style="width:28px;height:28px;margin:0 auto 10px;"></div>Gemini 正在整理重點… <span id="sumTimer" class="sum-timer">0s</span></div>`;
     box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const t0 = performance.now();
+    const timer = setInterval(() => { const el = $("sumTimer"); if (el) el.textContent = ((performance.now() - t0) / 1000).toFixed(0) + "s"; }, 250);
     const L = rec.lang ? langName(rec.lang) : "繁體中文";
     const transcript = rec.segments.map((s) => s.text).join("\n");
     const prompt = `以下是一支 YouTube 影片的逐字稿。請用「${L}」把它統整成一份**結構化重點報告**，目標是讓讀者不看影片也能完整掌握內容、節省時間。請深入歸納脈絡、重點與因果關係，做真正的整理與統整，而不是逐句摘要或簡短概述。
@@ -697,11 +712,12 @@
  "terms":[{"term":"重要名詞","definition":"簡短解釋"}],
  "insights":["值得記住的洞察、結論或可採取的行動，需經過歸納，不要照抄原句"],
  "conclusion":"整體總結，2-4 句",
- "diagram":{"type":"flow","nodes":[{"id":"n1","label":"節點文字（12字內）"}],"edges":[{"from":"n1","to":"n2","label":"選填關係"}]}
+ "diagram":{"type":"flow","nodes":[{"id":"n1","label":"節點文字（12字內）","emoji":"一個貼切的 emoji 圖示","kind":"root 或 branch"}],"edges":[{"from":"n1","to":"n2","label":"選填關係"}]}
 }
 要求：
 - key_points 至少 6 點；chapters 依內容多寡 3-8 個；皆依內容邏輯順序排列。
-- diagram 用 6-10 個節點畫出影片的主題結構或論述流程（中心主題 → 主要面向 → 重點），node id 用 n1、n2…，label 精簡（12 字內），edges 連出邏輯或因果關係。
+- diagram 用 7-11 個節點畫出影片的主題結構或論述流程（中心主題 → 主要面向 → 重點），node id 用 n1、n2…，label 精簡（12 字內），edges 連出邏輯或因果關係。
+- diagram 每個節點都要配一個貼切的 emoji 圖示（放在 emoji 欄位，例如影片主題若是手錶就用 ⌚、跑步用 🏃、價格用 💰 等）；中心主題節點的 kind 設為 "root"，其餘設為 "branch"。
 - terms、insights 若無可為空陣列；忠於逐字稿、不要杜撰；全部使用「${L}」。
 
 逐字稿：
@@ -718,6 +734,7 @@ ${transcript}`;
       const text = cand && cand.content && cand.content.parts && cand.content.parts.map((p) => p.text || "").join("");
       const parsed = safeJson(text);
       if (!parsed) throw new Error("回傳格式無法解析，請再試一次或換個模型。");
+      parsed._sec = Math.round(((performance.now() - t0) / 1000) * 10) / 10;
       rec.summary = parsed;
       localStorage.setItem(LS.model, model);
       const arr = getHistory(); const i = arr.findIndex((r) => r.id === rec.id);
@@ -726,7 +743,7 @@ ${transcript}`;
       $("summaryBox").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       box.innerHTML = `<div class="alert show error" style="margin:0;">${esc(err.message || String(err))}</div>`;
-    } finally { if (btn) btn.disabled = false; }
+    } finally { clearInterval(timer); if (btn) btn.disabled = false; }
   }
 
   // 示意圖（Mermaid，按需載入）
@@ -750,11 +767,23 @@ ${transcript}`;
     if (!dg || !Array.isArray(dg.nodes) || !dg.nodes.length) return null;
     const cleanId = (s) => String(s || "").replace(/[^A-Za-z0-9_]/g, "").slice(0, 20) || "n";
     const cleanLabel = (s) => String(s || "").replace(/["`|<>]/g, "").replace(/[\[\]{}()]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40) || "…";
+    const cleanEmoji = (s) => { s = String(s || "").trim(); try { return /\p{Extended_Pictographic}/u.test(s) ? Array.from(s).find((c) => /\p{Extended_Pictographic}/u.test(c)) || "" : ""; } catch (_) { return ""; } };
     const ids = new Set();
+    const roots = [], branches = [];
     const lines = ["graph TD"];
-    dg.nodes.forEach((n) => { const id = cleanId(n.id); if (!id || ids.has(id)) return; ids.add(id); lines.push(`  ${id}["${cleanLabel(n.label)}"]`); });
+    dg.nodes.forEach((n) => {
+      const id = cleanId(n.id); if (!id || ids.has(id)) return; ids.add(id);
+      const emo = cleanEmoji(n.emoji);
+      const label = (emo ? emo + " " : "") + cleanLabel(n.label);
+      lines.push(`  ${id}("${label}")`);
+      (String(n.kind || "").toLowerCase() === "root" ? roots : branches).push(id);
+    });
     if (ids.size < 2) return null;
     (dg.edges || []).forEach((e) => { const f = cleanId(e && e.from), t = cleanId(e && e.to); if (f && t && ids.has(f) && ids.has(t)) { const lbl = e.label ? `|"${cleanLabel(e.label)}"|` : ""; lines.push(`  ${f} -->${lbl} ${t}`); } });
+    lines.push("classDef root fill:#1D4ED8,stroke:#38BDF8,stroke-width:2px,color:#EAF2FF;");
+    lines.push("classDef branch fill:#111A2E,stroke:#2A3A5C,color:#F1F5F9;");
+    if (roots.length) lines.push("class " + roots.join(",") + " root;");
+    if (branches.length) lines.push("class " + branches.join(",") + " branch;");
     return lines.join("\n");
   }
   function renderDiagram(dg) {
@@ -770,7 +799,7 @@ ${transcript}`;
   function renderSummary(rec) {
     const box = $("summaryBox"); if (!box) return;
     const d = rec.summary; if (!d) { box.innerHTML = ""; return; }
-    let h = `<div class="report"><div class="report-bar"><span class="report-badge">✦ 重點整理</span><button class="btn-ghost" id="copySum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>複製 Markdown</button></div>`;
+    let h = `<div class="report"><div class="report-bar"><span class="report-badge">✦ 重點整理</span>${typeof d._sec === "number" ? `<span class="report-time">⏱ 耗時 ${d._sec} 秒</span>` : ""}<button class="btn-ghost" id="copySum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>複製 Markdown</button></div>`;
     if (d.title) h += `<h3 class="report-title">${esc(d.title)}</h3>`;
     if (Array.isArray(d.topic_tags) && d.topic_tags.length) h += `<div class="tags">${d.topic_tags.map((t) => `<span class="tag-chip">${esc(t)}</span>`).join("")}</div>`;
     if (d.tldr) h += `<div class="tldr"><b>一句話總結</b>${esc(d.tldr)}</div>`;
